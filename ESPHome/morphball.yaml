@@ -167,10 +167,15 @@ light:
           update_interval: 16ms
           intensity: 5%
       
-      # Lambda custom - gruppi LED come nel codice originale
+      # ==========================================
+      # CUSTOM ANIMATIONS - From Original MicroPython Code
+      # ==========================================
+      
+      # Pulse Sinusoidal - Original MicroPython version
+      # Uses math.sin for smooth breathing on all groups
       - addressable_lambda:
-          name: "Original Groups"
-          update_interval: 50ms
+          name: "Pulse Original"
+          update_interval: 20ms
           lambda: |-
             // Gruppo 0: Core grills [0, 19, 20, 25, 26, 31]
             static int group0[] = {0, 19, 20, 25, 26, 31};
@@ -178,36 +183,136 @@ light:
             static int group1[] = {1, 2, 17, 18, 21, 22, 23, 24, 27, 28, 29, 30};
             // Gruppo 2: Ring [3-16]
             
-            static uint32_t last_update = 0;
-            static float brightness = 0.3;
-            static bool increasing = true;
+            static float phase = 0;
+            static int direction = 1;
+            const float speed = 2.0;  // Increment per frame
+            const float brightness_max = 0.8;
             
-            uint32_t now = millis();
-            if (now - last_update > 20) {
-              last_update = now;
-              
-              if (increasing) {
-                brightness += 0.01;
-                if (brightness >= 1.0) increasing = false;
-              } else {
-                brightness -= 0.01;
-                if (brightness <= 0.3) increasing = true;
-              }
+            // Increment phase
+            phase += direction * speed;
+            
+            // Bounce at limits
+            if (phase >= 200) {
+              direction = -1;
+              phase = 200;
+            } else if (phase <= 0) {
+              direction = 1;
+              phase = 0;
             }
             
+            // Sinusoidal brightness: sin²(phase * π / 200)
+            float angle = phase * 3.14159 / 200.0;
+            float sin_val = sin(angle);
+            float factor = sin_val * sin_val * brightness_max;
+            
+            // Apply to all groups
             // Gruppo 0 - verde acqua core
             for (int i : group0) {
-              it[i] = Color(0, (uint8_t)(230 * brightness), (uint8_t)(100 * brightness));
+              it[i] = Color(0, (uint8_t)(230 * factor), (uint8_t)(100 * factor));
             }
             
             // Gruppo 1 - verde brillante
             for (int i : group1) {
-              it[i] = Color(0, (uint8_t)(255 * brightness), (uint8_t)(30 * brightness));
+              it[i] = Color(0, (uint8_t)(255 * factor), (uint8_t)(30 * factor));
             }
             
             // Gruppo 2 - verde brillante
             for (int i = 3; i < 17; i++) {
-              it[i] = Color(0, (uint8_t)(255 * brightness), (uint8_t)(30 * brightness));
+              it[i] = Color(0, (uint8_t)(255 * factor), (uint8_t)(30 * factor));
+            }
+      
+      # Rotation on Group 2 - Original MicroPython version
+      # Rotating gradient effect on outer ring only
+      - addressable_lambda:
+          name: "Rotation Original"
+          update_interval: 50ms
+          lambda: |-
+            // Gruppo 2: Ring [3-16] = 14 LEDs
+            static int group2[] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+            static int group2_size = 14;
+            static int index = 0;
+            const float brightness_max = 0.8;
+            
+            // Base color for group 2 (green)
+            const uint8_t base_r = 0;
+            const uint8_t base_g = 255;
+            const uint8_t base_b = 30;
+            
+            // Clear all LEDs first
+            for (int i = 0; i < it.size(); i++) {
+              it[i] = Color(0, 0, 0);
+            }
+            
+            // Apply rotating gradient on group 2
+            for (int i = 0; i < group2_size; i++) {
+              int led_index = group2[i];
+              
+              // Calculate distance from rotating index
+              int dist = (i - index + group2_size) % group2_size;
+              
+              // Fade based on distance (closer = brighter)
+              float factor = max(0.1f, (1.0f - (float)dist / group2_size)) * brightness_max;
+              
+              uint8_t r = (uint8_t)(base_r * factor);
+              uint8_t g = (uint8_t)(base_g * factor);
+              uint8_t b = (uint8_t)(base_b * factor);
+              
+              it[led_index] = Color(r, g, b);
+            }
+            
+            // Move to next position
+            index = (index + 1) % group2_size;
+      
+      # Static Color with Groups - Original MicroPython version
+      # All groups lit with different colors (standby mode)
+      - addressable_lambda:
+          name: "Static Standby"
+          update_interval: 100ms
+          lambda: |-
+            // Gruppo 0: Core grills [0, 19, 20, 25, 26, 31]
+            static int group0[] = {0, 19, 20, 25, 26, 31};
+            // Gruppo 1: Inner [1, 2, 17, 18, 21, 22, 23, 24, 27, 28, 29, 30]
+            static int group1[] = {1, 2, 17, 18, 21, 22, 23, 24, 27, 28, 29, 30};
+            
+            // Standby mode: only core grills dimly lit
+            // Gruppo 0 - dim green
+            for (int i : group0) {
+              it[i] = Color(0, 25, 10);
+            }
+            
+            // Groups 1 & 2 - off
+            for (int i : group1) {
+              it[i] = Color(0, 0, 0);
+            }
+            
+            for (int i = 3; i < 17; i++) {
+              it[i] = Color(0, 0, 0);
+            }
+      
+      # Full Active - All groups at full brightness
+      - addressable_lambda:
+          name: "Static Active"
+          update_interval: 100ms
+          lambda: |-
+            // Gruppo 0: Core grills [0, 19, 20, 25, 26, 31]
+            static int group0[] = {0, 19, 20, 25, 26, 31};
+            // Gruppo 1: Inner [1, 2, 17, 18, 21, 22, 23, 24, 27, 28, 29, 30]
+            static int group1[] = {1, 2, 17, 18, 21, 22, 23, 24, 27, 28, 29, 30};
+            
+            // Active mode: all groups lit
+            // Gruppo 0 - verde acqua core
+            for (int i : group0) {
+              it[i] = Color(0, 230, 100);
+            }
+            
+            // Gruppo 1 - verde brillante
+            for (int i : group1) {
+              it[i] = Color(0, 255, 30);
+            }
+            
+            // Gruppo 2 - verde brillante
+            for (int i = 3; i < 17; i++) {
+              it[i] = Color(0, 255, 30);
             }
 
 # ==========================================
@@ -292,7 +397,10 @@ select:
       - "Twinkle"
       - "Fireworks"
       - "Flicker"
-      - "Original Groups"
+      - "Pulse Original"
+      - "Rotation Original"
+      - "Static Standby"
+      - "Static Active"
     set_action:
       - if:
           condition:
