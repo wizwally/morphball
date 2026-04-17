@@ -1,0 +1,100 @@
+# ==========================================
+# LOVELACE CARD PER METROID MORPH BALL
+# ==========================================
+# Copia questo codice in Home Assistant:
+# Dashboard → Edit → Add Card → Manual (YAML)
+
+type: vertical-stack
+cards:
+  # Header con stato principale
+  - type: custom:mushroom-template-card
+    primary: Metroid Morph Ball
+    secondary: |-
+      {% if is_state('light.metroid_morph_ball_leds', 'on') %}
+        🟢 Attivo - {{ state_attr('light.metroid_morph_ball_leds', 'effect') }}
+      {% else %}
+        ⚫ Standby
+      {% endif %}
+    icon: mdi:sphere
+    icon_color: |-
+      {% if is_state('light.metroid_morph_ball_leds', 'on') %}
+        green
+      {% else %}
+        grey
+      {% endif %}
+    tap_action:
+      action: toggle
+      entity: light.metroid_morph_ball_leds
+    card_mod:
+      style: |
+        ha-card {
+          background: linear-gradient(135deg, rgba(0, 255, 100, 0.1) 0%, rgba(0, 100, 50, 0.1) 100%);
+        }
+
+  # Controllo luci principale
+  - type: light
+    entity: light.metroid_morph_ball_leds
+    name: LED Control
+    icon: mdi:led-strip-variant
+
+  # Selezione effetto
+  - type: custom:mushroom-select-card
+    entity: select.metroid_morph_ball_effect
+    name: Effetto LED
+    icon: mdi:palette
+    secondary_info: none
+    fill_container: true
+
+  # Controlli sleep
+  - type: entities
+    title: ⚙️ Configurazione Sleep
+    show_header_toggle: false
+    entities:
+      - entity: switch.metroid_morph_ball_sleep_mode
+        name: Sleep Mode
+        icon: mdi:power-sleep
+      
+      - type: custom:mushroom-number-card
+        entity: number.metroid_morph_ball_sleep_timeout
+        name: Timeout Sleep
+        icon: mdi:timer-sand
+        display_mode: slider
+        secondary_info: none
+      
+      - type: custom:mushroom-number-card
+        entity: number.metroid_morph_ball_standby_duration
+        name: Standby Duration
+        icon: mdi:timer-pause
+        display_mode: slider
+        secondary_info: none
+
+  # Sensori e diagnostica
+  - type: custom:mushroom-chips-card
+    chips:
+      - type: entity
+        entity: binary_sensor.metroid_morph_ball_motion
+        icon: mdi:motion-sensor
+        name: Motion
+        content_info: name
+        tap_action:
+          action: more-info
+      
+      - type: entity
+        entity: sensor.metroid_morph_ball_wifi_signal
+        icon: mdi:wifi
+        content_info: state
+        tap_action:
+          action: more-info
+      
+      - type: entity
+        entity: sensor.metroid_morph_ball_uptime
+        icon: mdi:clock-outline
+        content_info: state
+        tap_action:
+          action: more-info
+
+# ==========================================
+# NOTA: Questa card usa custom:mushroom cards
+# Se non le hai installate, installa "Mushroom" da HACS
+# Oppure usa la versione semplificata sotto
+# ==========================================

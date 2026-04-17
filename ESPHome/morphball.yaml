@@ -1,0 +1,369 @@
+substitutions:
+  device_name: morphball
+  friendly_name: "Metroid Morph Ball"
+  
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: -100
+    then:
+      # All'avvio, segnala al MG24 che siamo vivi
+      - output.turn_on: alive_output
+      - light.turn_on: 
+          id: morphball_light
+          effect: "Pulse"
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+# WiFi e API
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+  ap:
+    ssid: "${device_name} Fallback"
+    password: !secret ap_password
+
+# Home Assistant API
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+logger:
+  level: INFO
+
+# ==========================================
+# GPIO CONFIGURATION
+# ==========================================
+
+# Pin ALIVE → MG24 (GPIO7)
+output:
+  - platform: gpio
+    pin: GPIO7
+    id: alive_output
+    inverted: false
+
+# Pin MOTION ← MG24 (GPIO8)  
+binary_sensor:
+  - platform: gpio
+    pin: 
+      number: GPIO8
+      mode: INPUT
+    name: "${friendly_name} Motion"
+    id: motion_sensor
+    device_class: motion
+    filters:
+      - delayed_off: 200ms
+    on_press:
+      then:
+        - logger.log: "📡 Movimento rilevato dal MG24"
+        - script.execute: reset_sleep_timer
+        - if:
+            condition:
+              lambda: 'return id(sleep_mode_enabled);'
+            then:
+              - if:
+                  condition:
+                    light.is_off: morphball_light
+                  then:
+                    - logger.log: "Wake from standby"
+                    - light.turn_on: 
+                        id: morphball_light
+                        effect: !lambda 'return id(current_effect).state.c_str();'
+
+# ==========================================
+# LED STRIP WS2812B
+# ==========================================
+
+light:
+  - platform: neopixelbus
+    type: GRB
+    variant: WS2812
+    pin: GPIO18
+    num_leds: 32
+    name: "${friendly_name} LEDs"
+    id: morphball_light
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 500ms
+    effects:
+      # Pulse effect - classico
+      - pulse:
+          name: "Pulse"
+          transition_length: 1s
+          update_interval: 1s
+          min_brightness: 30%
+          max_brightness: 100%
+      
+      # Breathing - più lento e smooth
+      - pulse:
+          name: "Breathing"
+          transition_length: 2s
+          update_interval: 2s
+          min_brightness: 10%
+          max_brightness: 100%
+      
+      # Strobe - veloce
+      - strobe:
+          name: "Strobe"
+          colors:
+            - state: true
+              brightness: 100%
+              duration: 100ms
+            - state: false
+              duration: 100ms
+      
+      # Rainbow
+      - addressable_rainbow:
+          name: "Rainbow"
+          speed: 10
+          width: 32
+      
+      # Color wipe
+      - addressable_color_wipe:
+          name: "Color Wipe"
+          colors:
+            - red: 0%
+              green: 90%
+              blue: 39%
+              num_leds: 32
+            - red: 0%
+              green: 100%
+              blue: 12%
+              num_leds: 32
+          add_led_interval: 50ms
+          reverse: false
+      
+      # Scan
+      - addressable_scan:
+          name: "Scan"
+          move_interval: 50ms
+          scan_width: 4
+      
+      # Twinkle
+      - addressable_twinkle:
+          name: "Twinkle"
+          twinkle_probability: 5%
+          progress_interval: 50ms
+      
+      # Fireworks
+      - addressable_fireworks:
+          name: "Fireworks"
+          update_interval: 50ms
+          spark_probability: 10%
+          use_random_color: false
+          fade_out_rate: 120
+      
+      # Flicker
+      - addressable_flicker:
+          name: "Flicker"
+          update_interval: 16ms
+          intensity: 5%
+      
+      # Lambda custom - gruppi LED come nel codice originale
+      - addressable_lambda:
+          name: "Original Groups"
+          update_interval: 50ms
+          lambda: |-
+            // Gruppo 0: Core grills [0, 19, 20, 25, 26, 31]
+            static int group0[] = {0, 19, 20, 25, 26, 31};
+            // Gruppo 1: Inner [1, 2, 17, 18, 21, 22, 23, 24, 27, 28, 29, 30]
+            static int group1[] = {1, 2, 17, 18, 21, 22, 23, 24, 27, 28, 29, 30};
+            // Gruppo 2: Ring [3-16]
+            
+            static uint32_t last_update = 0;
+            static float brightness = 0.3;
+            static bool increasing = true;
+            
+            uint32_t now = millis();
+            if (now - last_update > 20) {
+              last_update = now;
+              
+              if (increasing) {
+                brightness += 0.01;
+                if (brightness >= 1.0) increasing = false;
+              } else {
+                brightness -= 0.01;
+                if (brightness <= 0.3) increasing = true;
+              }
+            }
+            
+            // Gruppo 0 - verde acqua core
+            for (int i : group0) {
+              it[i] = Color(0, (uint8_t)(230 * brightness), (uint8_t)(100 * brightness));
+            }
+            
+            // Gruppo 1 - verde brillante
+            for (int i : group1) {
+              it[i] = Color(0, (uint8_t)(255 * brightness), (uint8_t)(30 * brightness));
+            }
+            
+            // Gruppo 2 - verde brillante
+            for (int i = 3; i < 17; i++) {
+              it[i] = Color(0, (uint8_t)(255 * brightness), (uint8_t)(30 * brightness));
+            }
+
+# ==========================================
+# SLEEP MANAGEMENT
+# ==========================================
+
+globals:
+  - id: last_motion_time
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  
+  - id: sleep_mode_enabled
+    type: bool
+    restore_value: yes
+    initial_value: 'true'
+
+# Sleep timeout configurabile
+number:
+  - platform: template
+    name: "${friendly_name} Sleep Timeout"
+    id: sleep_timeout
+    icon: mdi:timer-sand
+    optimistic: true
+    restore_value: true
+    initial_value: 20
+    min_value: 5
+    max_value: 300
+    step: 5
+    unit_of_measurement: "s"
+    mode: box
+
+  - platform: template
+    name: "${friendly_name} Standby Duration"
+    id: standby_duration
+    icon: mdi:timer-pause
+    optimistic: true
+    restore_value: true
+    initial_value: 20
+    min_value: 5
+    max_value: 120
+    step: 5
+    unit_of_measurement: "s"
+    mode: box
+
+# Switch per abilitare/disabilitare deep sleep
+switch:
+  - platform: template
+    name: "${friendly_name} Sleep Mode"
+    id: sleep_mode_switch
+    icon: mdi:power-sleep
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - globals.set:
+          id: sleep_mode_enabled
+          value: 'true'
+      - logger.log: "Sleep mode ENABLED"
+    turn_off_action:
+      - globals.set:
+          id: sleep_mode_enabled
+          value: 'false'
+      - logger.log: "Sleep mode DISABLED"
+
+# Select per scegliere l'effetto
+select:
+  - platform: template
+    name: "${friendly_name} Effect"
+    id: current_effect
+    icon: mdi:palette
+    optimistic: true
+    restore_value: true
+    initial_option: "Pulse"
+    options:
+      - "None"
+      - "Pulse"
+      - "Breathing"
+      - "Strobe"
+      - "Rainbow"
+      - "Color Wipe"
+      - "Scan"
+      - "Twinkle"
+      - "Fireworks"
+      - "Flicker"
+      - "Original Groups"
+    set_action:
+      - if:
+          condition:
+            lambda: 'return x == "None";'
+          then:
+            - light.turn_on:
+                id: morphball_light
+                effect: "none"
+          else:
+            - light.turn_on:
+                id: morphball_light
+                effect: !lambda 'return x.c_str();'
+
+# Script per reset del timer di sleep
+script:
+  - id: reset_sleep_timer
+    then:
+      - globals.set:
+          id: last_motion_time
+          value: !lambda 'return millis();'
+      - logger.log: "⏱️ Sleep timer reset"
+
+# Interval per monitorare il timeout
+interval:
+  - interval: 1s
+    then:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(sleep_mode_enabled)) return false;
+              if (id(last_motion_time) == 0) return false;
+              
+              uint32_t timeout_ms = id(sleep_timeout).state * 1000;
+              uint32_t elapsed = millis() - id(last_motion_time);
+              
+              return elapsed > timeout_ms;
+          then:
+            - logger.log: "💤 Timeout raggiunto - entro in standby"
+            - light.turn_off: morphball_light
+            - delay: !lambda 'return id(standby_duration).state * 1000;'
+            - if:
+                condition:
+                  # Se durante lo standby c'è stato movimento, non fare deep sleep
+                  lambda: |-
+                    uint32_t timeout_ms = id(sleep_timeout).state * 1000;
+                    uint32_t elapsed = millis() - id(last_motion_time);
+                    return elapsed > timeout_ms;
+                then:
+                  - logger.log: "💤 Deep sleep attivato"
+                  - output.turn_off: alive_output
+                  - delay: 100ms
+                  - deep_sleep.enter: deep_sleep_mode
+
+# Deep sleep con wake su GPIO8
+deep_sleep:
+  id: deep_sleep_mode
+  wakeup_pin: 
+    number: GPIO8
+    mode: INPUT
+  wakeup_pin_mode: KEEP_AWAKE
+
+# Sensori di diagnostica
+sensor:
+  - platform: wifi_signal
+    name: "${friendly_name} WiFi Signal"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${friendly_name} IP Address"

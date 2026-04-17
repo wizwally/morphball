@@ -1,0 +1,66 @@
+# ==========================================
+# LOVELACE CARD SEMPLIFICATA (senza custom cards)
+# ==========================================
+# Usa questa se non hai Mushroom cards installate
+
+type: vertical-stack
+cards:
+  # Controllo LED principale
+  - type: light
+    entity: light.metroid_morph_ball_leds
+    name: 🔮 Metroid Morph Ball
+
+  # Selezione effetto
+  - type: entities
+    title: 🎨 Effetti LED
+    show_header_toggle: false
+    entities:
+      - entity: select.metroid_morph_ball_effect
+        name: Effetto Corrente
+        icon: mdi:palette
+
+  # Configurazione Sleep
+  - type: entities
+    title: ⚙️ Configurazione Sleep
+    show_header_toggle: false
+    entities:
+      - entity: switch.metroid_morph_ball_sleep_mode
+        name: Sleep Mode Abilitato
+        icon: mdi:power-sleep
+      
+      - entity: number.metroid_morph_ball_sleep_timeout
+        name: Timeout Sleep (secondi)
+        icon: mdi:timer-sand
+      
+      - entity: number.metroid_morph_ball_standby_duration
+        name: Durata Standby (secondi)
+        icon: mdi:timer-pause
+
+  # Stato e diagnostica
+  - type: entities
+    title: 📊 Stato Sistema
+    show_header_toggle: false
+    entities:
+      - entity: binary_sensor.metroid_morph_ball_motion
+        name: Sensore Movimento
+        icon: mdi:motion-sensor
+      
+      - entity: sensor.metroid_morph_ball_wifi_signal
+        name: Segnale WiFi
+        icon: mdi:wifi
+      
+      - entity: sensor.metroid_morph_ball_uptime
+        name: Uptime
+        icon: mdi:clock-outline
+      
+      - entity: text_sensor.metroid_morph_ball_ip_address
+        name: Indirizzo IP
+        icon: mdi:ip-network
+
+# ==========================================
+# CONFIGURAZIONE PREDEFINITA
+# ==========================================
+# Questa card funziona out-of-the-box senza custom cards.
+# Per un look migliore, installa "Mushroom" da HACS
+# e usa lovelace-card.yaml
+# ==========================================

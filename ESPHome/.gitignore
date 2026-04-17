@@ -1,0 +1,8 @@
+# ESPHome secrets
+secrets.yaml
+
+# ESPHome build artifacts
+.esphome/
+*.bin
+*.elf
+*.map
