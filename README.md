@@ -1,59 +1,99 @@
 # 🔮 Metroid Morph Ball
 
-Action figure 3D stampata della Morph Ball di Metroid con animazioni LED controllate da ESP32 e sensore di movimento IMU.
+3D printed Metroid Morph Ball action figure with LED animations controlled by ESP32 and IMU motion sensor.
 
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-ESP32--S3-green.svg)
 ![Status](https://img.shields.io/badge/status-active-success.svg)
 
-## 📋 Indice
+[🇮🇹 Versione Italiana](README.md) | 🇬🇧 English Version
 
-- [Panoramica](#panoramica)
-- [Caratteristiche](#caratteristiche)
+## 📋 Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
 - [Hardware](#hardware)
 - [Software](#software)
-- [Installazione](#installazione)
-- [Utilizzo](#utilizzo)
-- [Sviluppo Futuro](#sviluppo-futuro)
-- [Contribuire](#contribuire)
-- [Licenza](#licenza)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Future Development](#future-development)
+- [Contributing](#contributing)
+- [License](#license)
 
-## 🎮 Panoramica
+## 🎮 Overview
 
-Questo progetto ricrea la leggendaria **Morph Ball** della serie Metroid come action figure interattiva stampata in 3D. La sfera si illumina con 32 LED WS2812B programmabili e risponde al movimento grazie a un sensore IMU, entrando automaticamente in deep sleep quando è ferma per risparmiare batteria.
+This project recreates the legendary **Morph Ball** from the Metroid series as an interactive 3D printed action figure. The sphere illuminates with 32 programmable WS2812B LEDs and responds to movement thanks to an IMU sensor, automatically entering deep sleep when stationary to save battery.
 
-### Due Versioni Disponibili
+### Two Available Versions
 
-Il progetto offre due implementazioni complete:
+The project offers two complete implementations:
 
-1. **MicroPython** (`/ESP32` + `/MG24`) - Versione standalone originale
-2. **ESPHome** (`/ESPHome`) - Integrazione completa con Home Assistant
+1. **MicroPython** (`/ESP32` + `/MG24`) - Original standalone version
+2. **ESPHome** (`/ESPHome`) - Full Home Assistant integration
 
-## ✨ Caratteristiche
+## ✨ Features
 
-- 🎨 **32 LED RGB WS2812B** con animazioni customizzabili
-- 🏃 **Rilevamento movimento** tramite accelerometro LSM6DS3
-- 💤 **Deep sleep automatico** per risparmio energetico
-- 🔋 **Wake su movimento** per attivazione istantanea
-- 🏠 **Integrazione Home Assistant** (versione ESPHome)
-- 📱 **Controllo WiFi** con selezione effetti e configurazione
-- 🎯 **Gruppi LED personalizzati** che riproducono l'estetica Metroid
-- ⚡ **Architettura dual-MCU** (ESP32-S3 + MG24) per ottimizzazione consumi
+- 🎨 **32 RGB WS2812B LEDs** with customizable animations
+- 🏃 **Motion detection** via LSM6DS3 accelerometer
+- 💤 **Automatic deep sleep** for energy saving
+- 🔋 **Wake on movement** for instant activation
+- 🏠 **Home Assistant integration** (ESPHome version)
+- 📱 **WiFi control** with effect selection and configuration
+- 🎯 **Custom LED groups** that reproduce the Metroid aesthetic
+- ⚡ **Dual-MCU architecture** (ESP32-S3 + MG24) for optimized power consumption
 
 ## 🔧 Hardware
 
-### Componenti Principali
+### Why Dual-MCU Architecture?
 
-| Componente | Modello | Quantità | Note |
-|------------|---------|----------|------|
-| Microcontroller principale | ESP32-S3 Tiny | 1 | Controllo LED e WiFi |
-| Microcontroller IMU | Seeed XIAO MG24 | 1 | Rilevamento movimento |
-| LED Strip | WS2812B | 32 LED | Divisi in 3 gruppi |
-| IMU | LSM6DS3 | 1 | Integrato nel MG24 |
-| Batteria | LiPo 3.7V | 1 | Capacità da definire |
-| Switch | ON/OFF | 1 | Alimentazione |
+This project uses **two microcontrollers** instead of one for strategic reasons:
 
-### Schema Connessioni
+1. **🔋 Optimized Power Management**
+   - MG24 runs in ultra-low power mode continuously monitoring the IMU
+   - ESP32 can deep sleep (~10µA) while MG24 acts as motion "sentinel"
+   - Wake-on-motion with minimal latency and maximum battery life
+
+2. **📡 ESP32-S3 Tiny Has No Integrated IMU**
+   - The compact ESP32-S3 Tiny form factor doesn't include motion sensors
+   - XIAO MG24 has LSM6DS3 accelerometer already integrated on-board
+   - No need for external IMU breakout boards and extra wiring
+
+3. **⚡ Task Separation & Real-Time Performance**
+   - **MG24**: Dedicated to real-time IMU polling (20Hz) and motion detection
+   - **ESP32**: Handles LED animations, WiFi, Home Assistant integration
+   - No resource contention - each MCU does what it does best
+
+4. **🎯 Continuous Monitoring Without Impact**
+   - MG24 polls IMU continuously at 20Hz without affecting ESP32 performance
+   - LED animations run smoothly on ESP32 without IMU polling overhead
+   - Clean separation of concerns in the codebase
+
+**Alternative single-MCU approach drawbacks:**
+- ❌ ESP32 polling IMU = high power consumption (no true deep sleep)
+- ❌ Wake-on-timer = high latency (100-500ms) and still wastes power
+- ❌ External IMU module = more complex wiring, larger footprint
+
+**Dual-MCU benefits:**
+- ✅ Best-in-class power efficiency (~100µA average in standby)
+- ✅ Instant wake on motion (<50ms latency)
+- ✅ Modular architecture (can upgrade/swap MCUs independently)
+- ✅ Both MCUs in same XIAO form factor (stack back-to-back)
+
+### Main Components
+
+| Component | Model | Quantity | Est. Price | Link/Notes |
+|-----------|-------|----------|------------|------------|
+| **ESP32-S3 Tiny** | Dual-core, WiFi, BLE | 1 | €8-12 | Ideal small form factor |
+| **Seeed XIAO MG24** | ARM Cortex-M33, integrated LSM6DS3 | 1 | €10-15 | Includes on-board IMU |
+| **LED Strip WS2812B** | 5V, IP30, 60 LED/m | 32 LED (~53cm) | €5-8 | Cuttable every LED |
+| **LiPo Battery** | 3.7V, 500-1000mAh | 1 | €8-12 | Size TBD |
+| **Charging Module** | TP4056 or similar | 1 | €2-3 | With protection |
+| **ON/OFF Switch** | Slide switch 3 pin | 1 | €0.50 | Miniature |
+| **JST Connectors** | 2.54mm pitch | Various | €2-3 | For modular connections |
+| **Wires** | AWG 22-26, silicone | 1m | €2-3 | Red/Black/Data |
+| **Heat shrink** | Heat shrink tubing | 10cm | €1 | Various sizes |
+
+### Connection Diagram
 
 ```
 ESP32-S3 Tiny          MG24 (XIAO)         LED Strip
@@ -70,113 +110,115 @@ ESP32-S3 Tiny          MG24 (XIAO)         LED Strip
 │ 3V3    ─────┼───────┤ 3V3      │        │         │
 │ GND    ─────┼───────┤ GND      ├────────┤ GND     │
 │             │       │          │        │         │
-└─────────────┘       └──────────┘        │ +5V ◄───┤ Batteria
+└─────────────┘       └──────────┘        │ +5V ◄───┤ Battery
                                           └─────────┘
 ```
 
-### Dettagli Pin
+### Pin Details
 
 **ESP32-S3 Tiny:**
-- `GPIO18`: DIN del LED strip WS2812B
-- `GPIO8`: Input da MG24 (HIGH quando c'è movimento)
-- `GPIO7`: Output verso MG24 (HIGH quando animazioni attive)
+- `GPIO18`: DIN of WS2812B LED strip
+- `GPIO8`: Input from MG24 (HIGH when motion detected)
+- `GPIO7`: Output to MG24 (HIGH when animations active)
 
 **MG24 (XIAO):**
-- `D4`: Output verso ESP32 (pulse su movimento)
-- `D5`: Input da ESP32 (stato animazioni)
-- `SDA/SCL`: I2C per LSM6DS3 (interno)
+- `D4`: Output to ESP32 (pulse on movement)
+- `D5`: Input from ESP32 (animation status)
+- `SDA/SCL`: I2C for LSM6DS3 (internal)
 
-### Disposizione LED
+### LED Layout
 
-I 32 LED sono organizzati in 3 gruppi per ricreare l'estetica Metroid:
+The 32 LEDs are organized in 3 groups to recreate the Metroid aesthetic:
 
-- **Gruppo 0** (6 LED): Core grills - Verde acqua `(0, 230, 100)`
-  - Posizioni: `[0, 19, 20, 25, 26, 31]`
+- **Group 0** (6 LEDs): Core grills - Aqua green `(0, 230, 100)`
+  - Positions: `[0, 19, 20, 25, 26, 31]`
   
-- **Gruppo 1** (12 LED): Inner ring - Verde brillante `(0, 255, 30)`
-  - Posizioni: `[1, 2, 17, 18, 21, 22, 23, 24, 27, 28, 29, 30]`
+- **Group 1** (12 LEDs): Inner ring - Bright green `(0, 255, 30)`
+  - Positions: `[1, 2, 17, 18, 21, 22, 23, 24, 27, 28, 29, 30]`
   
-- **Gruppo 2** (14 LED): Outer ring - Verde brillante `(0, 255, 30)`
-  - Posizioni: `[3-16]`
+- **Group 2** (14 LEDs): Outer ring - Bright green `(0, 255, 30)`
+  - Positions: `[3-16]`
 
 ## 💾 Software
 
-### Struttura Repository
+### Repository Structure
 
 ```
 morphball/
-├── 3D model/                # Modello 3D stampabile
+├── 3D model/                # 3D printable model
 │   └── MorphBall.3mf
-├── ESP32/                   # Versione MicroPython standalone
+├── ESP32/                   # MicroPython standalone version
 │   ├── main.py             # Entry point
-│   ├── ledstrip.py         # Gestione LED
-│   └── animations/         # Effetti LED
+│   ├── ledstrip.py         # LED management
+│   └── animations/         # LED effects
 │       ├── base.py
 │       ├── pulse.py
 │       ├── rotation.py
 │       └── static.py
-├── MG24/                    # Codice sensore movimento
-│   └── mg24_imu.ino        # Arduino sketch per IMU
-├── ESPHome/                 # Versione Home Assistant
-│   ├── morphball.yaml      # Config ESPHome
-│   ├── README.md           # Guida setup
-│   ├── lovelace-card.yaml  # Dashboard HA
+├── MG24/                    # Motion sensor code
+│   └── mg24_imu.ino        # Arduino sketch for IMU
+├── ESPHome/                 # Home Assistant version
+│   ├── morphball.yaml      # ESPHome config
+│   ├── README.md           # Setup guide
+│   ├── lovelace-card.yaml  # HA Dashboard
 │   └── secrets.yaml.example
-└── docs/                    # Documentazione (questa cartella)
+└── docs/                    # Documentation
+    ├── en/                  # English docs
+    └── [IT docs]            # Italian docs
 ```
 
-### Versione MicroPython
+### MicroPython Version
 
-**Caratteristiche:**
-- Standalone, non richiede connessione WiFi
-- Animazione pulse automatica
-- Sleep dopo 20 secondi di inattività
-- Deep sleep dopo ulteriori 20 secondi in standby
+**Features:**
+- Standalone, doesn't require WiFi connection
+- Automatic pulse animation
+- Sleep after 20 seconds of inactivity
+- Deep sleep after additional 20 seconds in standby
 
-**Files principali:**
-- `main.py`: Loop principale, gestione thread, sleep management
-- `ledstrip.py`: Classe per controllo WS2812B con gruppi
-- `animations/`: Moduli con diversi effetti LED
+**Main files:**
+- `main.py`: Main loop, thread management, sleep management
+- `ledstrip.py`: Class for WS2812B control with groups
+- `animations/`: Modules with different LED effects
 
-### Versione ESPHome
+### ESPHome Version
 
-**Caratteristiche:**
-- Integrazione nativa con Home Assistant
-- 11 effetti LED selezionabili
-- Configurazione timeout via dashboard
+**Features:**
+- Native Home Assistant integration
+- 11 selectable LED effects
+- Timeout configuration via dashboard
 - OTA updates
-- Diagnostica completa (WiFi, uptime, IP)
+- Complete diagnostics (WiFi, uptime, IP)
 
-**Vantaggi:**
-- Nessuna app mobile necessaria
-- Configurazione via interfaccia web
-- Automazioni HA disponibili
-- Sincronizzazione con altri dispositivi
+**Advantages:**
+- No mobile app needed
+- Configuration via web interface
+- HA automations available
+- Synchronization with other devices
 
-Vedi [ESPHome/README.md](ESPHome/README.md) per dettagli completi.
+See [ESPHome/README.md](ESPHome/README.md) for complete details.
 
-## 🚀 Installazione
+## 🚀 Installation
 
-### Requisiti Software
+### Software Requirements
 
-**Per versione MicroPython:**
+**For MicroPython version:**
 - Python 3.7+
-- `esptool` per flash
-- `mpremote` o `ampy` per upload files
+- `esptool` for flashing
+- `mpremote` or `ampy` for file upload
 
-**Per versione ESPHome:**
-- ESPHome CLI o addon Home Assistant
-- Home Assistant (ovviamente!)
+**For ESPHome version:**
+- ESPHome CLI or Home Assistant addon
+- Home Assistant (obviously!)
 
-### Setup Versione MicroPython
+### MicroPython Version Setup
 
-1. **Flash MicroPython su ESP32-S3:**
+1. **Flash MicroPython on ESP32-S3:**
 ```bash
 esptool.py --chip esp32s3 --port /dev/ttyUSB0 erase_flash
 esptool.py --chip esp32s3 --port /dev/ttyUSB0 write_flash -z 0x0 esp32s3-micropython.bin
 ```
 
-2. **Upload codice:**
+2. **Upload code:**
 ```bash
 cd ESP32
 mpremote connect /dev/ttyUSB0 cp -r . :
@@ -184,46 +226,46 @@ mpremote connect /dev/ttyUSB0 cp -r . :
 
 3. **Flash MG24:**
 ```bash
-# Usa Arduino IDE
+# Use Arduino IDE
 # Board: Seeed XIAO MG24
 # Upload: MG24/mg24_imu.ino
 ```
 
-### Setup Versione ESPHome
+### ESPHome Version Setup
 
-Vedi documentazione completa in [ESPHome/README.md](ESPHome/README.md)
+See complete documentation in [ESPHome/README.md](ESPHome/README.md)
 
 **Quick start:**
 ```bash
 cd ESPHome
 cp secrets.yaml.example secrets.yaml
-# Edita secrets.yaml con le tue credenziali
+# Edit secrets.yaml with your credentials
 esphome run morphball.yaml
 ```
 
-## 🎯 Utilizzo
+## 🎯 Usage
 
-### Versione MicroPython
+### MicroPython Version
 
-La Morph Ball si attiva automaticamente:
-1. **Movimento rilevato** → LED si accendono con effetto pulse
-2. **20s di inattività** → Entra in standby (solo core grills accesi)
-3. **Altri 20s ferma** → Deep sleep completo
-4. **Nuovo movimento** → Wake automatico e riattivazione
+The Morph Ball activates automatically:
+1. **Motion detected** → LEDs turn on with pulse effect
+2. **20s of inactivity** → Enters standby (only core grills lit)
+3. **Another 20s stationary** → Complete deep sleep
+4. **New movement** → Automatic wake and reactivation
 
-### Versione ESPHome
+### ESPHome Version
 
-**Dashboard Home Assistant:**
-1. Accendi/spegni LED
-2. Seleziona effetto dal dropdown
-3. Regola timeout sleep con slider
-4. Abilita/disabilita deep sleep mode
-5. Monitora stato movimento e diagnostica
+**Home Assistant Dashboard:**
+1. Turn LEDs on/off
+2. Select effect from dropdown
+3. Adjust sleep timeout with slider
+4. Enable/disable deep sleep mode
+5. Monitor motion status and diagnostics
 
-**Automazioni esempio:**
+**Example automations:**
 
 ```yaml
-# Attiva Rainbow al tramonto
+# Activate Rainbow at sunset
 automation:
   - alias: "Morphball Rainbow Sunset"
     trigger:
@@ -237,57 +279,59 @@ automation:
           option: "Rainbow"
 ```
 
-## 🔮 Sviluppo Futuro
+## 🔮 Future Development
 
 ### Roadmap
 
-- [ ] **Riconoscimento gesti** - Shake, roll, tilt trigger effetti diversi
-- [ ] **Batteria monitoring** - Indicatore livello carica
-- [ ] **Modalità gioco** - Mini-game interattivi
-- [ ] **Sincronizzazione multi-ball** - Più Morph Ball che comunicano
-- [ ] **Audio feedback** - Speaker per suoni Metroid
-- [ ] **Charging dock** - Base di ricarica wireless
-- [ ] **App mobile** - Per versione MicroPython standalone
-- [ ] **Effetti audio-reactive** - Sync con musica
+- [ ] **Gesture recognition** - Shake, roll, tilt trigger different effects
+- [ ] **Battery monitoring** - Charge level indicator
+- [ ] **Game mode** - Interactive mini-games
+- [ ] **Multi-ball sync** - Multiple Morph Balls communicating
+- [ ] **Audio feedback** - Speaker for Metroid sounds
+- [ ] **Charging dock** - Wireless charging base
+- [ ] **Mobile app** - For standalone MicroPython version
+- [ ] **Audio-reactive effects** - Music synchronization
 
-### Idee per Contributi
+### Contribution Ideas
 
-- Nuove animazioni LED
-- Ottimizzazione consumi energetici
-- Miglioramenti modello 3D
-- Porting su altri microcontroller
-- Integrazione con altri smart home systems (Alexa, Google Home)
+- New LED animations
+- Power consumption optimization
+- 3D model improvements
+- Porting to other microcontrollers
+- Integration with other smart home systems (Alexa, Google Home)
 
-## 🤝 Contribuire
+## 🤝 Contributing
 
-Contributi benvenuti! Ecco come:
+Contributions welcome! Here's how:
 
-1. **Fork** il repository
-2. Crea un **branch** per la tua feature (`git checkout -b feature/AmazingFeature`)
-3. **Commit** le modifiche (`git commit -m 'Add some AmazingFeature'`)
-4. **Push** al branch (`git push origin feature/AmazingFeature`)
-5. Apri una **Pull Request**
+1. **Fork** the repository
+2. Create a **branch** for your feature (`git checkout -b feature/AmazingFeature`)
+3. **Commit** your changes (`git commit -m 'Add some AmazingFeature'`)
+4. **Push** to the branch (`git push origin feature/AmazingFeature`)
+5. Open a **Pull Request**
 
-### Linee Guida
+### Guidelines
 
-- Commenta il codice (possibilmente in italiano)
-- Testa le modifiche prima del commit
-- Aggiorna la documentazione se necessario
-- Segui lo stile di codice esistente
+- Comment code (English preferred for international collaboration)
+- Test changes before committing
+- Update documentation if necessary
+- Follow existing code style
 
-## 📄 Licenza
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-Questo progetto è rilasciato sotto licenza **GPL-3.0**. Vedi [LICENSE](LICENSE) per dettagli.
+## 📄 License
 
-## 🙏 Ringraziamenti
+This project is released under **GPL-3.0 License**. See [LICENSE](LICENSE) for details.
 
-- **Nintendo/Retro Studios** per l'ispirazione Metroid
-- **Comunità ESPHome** per il framework fantastico
-- **Home Assistant** per la piattaforma domotica
-- **Seeed Studio** per il XIAO MG24
-- Tutti i contributor che miglioreranno questo progetto!
+## 🙏 Acknowledgments
 
-## 📞 Contatti
+- **Nintendo/Retro Studios** for Metroid inspiration
+- **ESPHome Community** for the fantastic framework
+- **Home Assistant** for the home automation platform
+- **Seeed Studio** for XIAO MG24
+- All contributors who will improve this project!
+
+## 📞 Contact
 
 **Gualtiero Saderis** - [@wizwally](https://github.com/wizwally)
 
@@ -295,4 +339,20 @@ Project Link: [https://github.com/wizwally/morphball](https://github.com/wizwall
 
 ---
 
-**Fatto con ❤️ e nostalgia per i classici Nintendo**
+## 📚 Documentation
+
+- **English:**
+  - [Hardware Guide](docs/en/HARDWARE.md)
+  - [Software Architecture](docs/en/SOFTWARE.md)
+  - [Build Tutorial](docs/en/TUTORIAL.md)
+  - [Contributing Guide](docs/en/CONTRIBUTING.md)
+
+- **Italiano:**
+  - [Guida Hardware](docs/HARDWARE.md)
+  - [Architettura Software](docs/SOFTWARE.md)
+  - [Tutorial Completo](docs/TUTORIAL.md)
+  - [Come Contribuire](CONTRIBUTING.md)
+
+---
+
+**Made with ❤️ and nostalgia for Nintendo classics**

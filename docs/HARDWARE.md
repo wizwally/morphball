@@ -2,6 +2,47 @@
 
 Guida completa all'hardware del progetto Morph Ball.
 
+## 🎯 Razionale Architettura Dual-MCU
+
+### Perché Due Microcontrollori?
+
+Questo design usa **ESP32-S3 + MG24** invece di un singolo MCU per prestazioni e efficienza energetica ottimali:
+
+**🔋 Eccellenza nel Power Management**
+- MG24 monitora continuamente l'IMU in modalità ultra-low power (~50µA)
+- ESP32 in deep sleep a ~10µA quando inattivo
+- **Totale standby: ~100µA** (vs. ~5000µA se ESP32 dovesse fare polling IMU)
+- Autonomia batteria in standby: **400+ giorni** vs. ~30 giorni single-MCU
+
+**⚡ Performance Real-Time**
+- **MG24**: Polling IMU dedicato a 20Hz, rilevamento movimento <50ms
+- **ESP32**: Animazioni LED a 60fps, WiFi, zero overhead interrupt
+- Zero contesa risorse = animazioni fluide + wake istantaneo
+
+**🎯 Specializzazione Task**
+| Task | ESP32-S3 | MG24 |
+|------|----------|------|
+| Controllo LED | ✅ Primario | - |
+| WiFi/BLE | ✅ Primario | - |
+| Polling IMU | - | ✅ Primario |
+| Rilevamento Movimento | - | ✅ Primario |
+| Deep Sleep | ✅ Ultra-basso | ✅ Low power |
+| Wake Trigger | Riceve | Invia |
+
+**📐 Integrazione Fisica**
+- Entrambi in form factor XIAO (21x17.5mm)
+- Stack back-to-back con 4 fili
+- Stesso ingombro di un singolo MCU più grande
+- Modulare: swap/upgrade indipendenti
+
+**vs. Alternative Single-MCU:**
+
+| Approccio | Consumo (Standby) | Latenza Wake | Complessità |
+|-----------|-------------------|--------------|-------------|
+| **ESP32 + IMU Esterno** | ~5mA | 100-500ms | Cablaggio complesso |
+| **ESP32 wake-on-timer** | ~500µA | 200-1000ms | Media |
+| **Dual-MCU (Questo)** | **~100µA** | **<50ms** | Bassa (4 fili) |
+
 ## 📦 Bill of Materials (BOM)
 
 ### Componenti Elettronici

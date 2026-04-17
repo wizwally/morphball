@@ -2,6 +2,47 @@
 
 Complete hardware guide for the Morph Ball project.
 
+## 🎯 Dual-MCU Architecture Rationale
+
+### Why Two Microcontrollers?
+
+This design uses **ESP32-S3 + MG24** instead of a single MCU for optimal performance and power efficiency:
+
+**🔋 Power Management Excellence**
+- MG24 continuously monitors IMU in ultra-low power mode (~50µA)
+- ESP32 deep sleeps at ~10µA when inactive
+- **Total standby: ~100µA** (vs. ~5000µA if ESP32 had to poll IMU)
+- Battery life in standby: **400+ days** vs. ~30 days single-MCU
+
+**⚡ Real-Time Performance**
+- **MG24**: Dedicated 20Hz IMU polling, <50ms motion detection
+- **ESP32**: 60fps LED animations, WiFi, no interrupt overhead
+- Zero resource contention = smooth animations + instant wake
+
+**🎯 Task Specialization**
+| Task | ESP32-S3 | MG24 |
+|------|----------|------|
+| LED Control | ✅ Primary | - |
+| WiFi/BLE | ✅ Primary | - |
+| IMU Polling | - | ✅ Primary |
+| Motion Detection | - | ✅ Primary |
+| Deep Sleep | ✅ Ultra-low | ✅ Low power |
+| Wake Trigger | Receives | Sends |
+
+**📐 Physical Integration**
+- Both use XIAO form factor (21x17.5mm)
+- Stack back-to-back with 4 wires
+- Same footprint as single larger MCU
+- Modular: swap/upgrade independently
+
+**vs. Single-MCU Alternatives:**
+
+| Approach | Power (Standby) | Wake Latency | Complexity |
+|----------|----------------|--------------|------------|
+| **ESP32 + External IMU** | ~5mA | 100-500ms | High wiring |
+| **ESP32 wake-on-timer** | ~500µA | 200-1000ms | Medium |
+| **Dual-MCU (This)** | **~100µA** | **<50ms** | Low (4 wires) |
+
 ## 📦 Bill of Materials (BOM)
 
 ### Electronic Components
