@@ -57,6 +57,8 @@ binary_sensor:
     pin: 
       number: GPIO8
       mode: INPUT
+      inverted: false
+      allow_other_uses: true  # Permette uso anche come wakeup_pin per deep_sleep
     name: "${friendly_name} Motion"
     id: motion_sensor
     device_class: motion
