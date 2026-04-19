@@ -456,13 +456,14 @@ interval:
                   - delay: 100ms
                   - deep_sleep.enter: deep_sleep_mode
 
-# Deep sleep con wake su GPIO8
+# Deep sleep con wake su GPIO8 (usando ext1 per compatibilità)
 deep_sleep:
   id: deep_sleep_mode
-  wakeup_pin: 
-    number: GPIO8
-    mode: INPUT
-  wakeup_pin_mode: KEEP_AWAKE
+  esp32_ext1_wakeup:
+    pins:
+      - number: GPIO8
+        mode: INPUT_PULLDOWN
+    mode: ANY_HIGH
 
 # Sensori di diagnostica
 sensor:
