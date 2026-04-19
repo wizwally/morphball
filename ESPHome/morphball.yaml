@@ -454,16 +454,13 @@ interval:
                   - logger.log: "💤 Deep sleep attivato"
                   - output.turn_off: alive_output
                   - delay: 100ms
-                  - deep_sleep.enter: deep_sleep_mode
+                  # Deep sleep temporaneamente disabilitato
+                  # - deep_sleep.enter: deep_sleep_mode
 
-# Deep sleep con wake su GPIO8 (usando ext1 per compatibilità)
-deep_sleep:
-  id: deep_sleep_mode
-  esp32_ext1_wakeup:
-    pins:
-      - number: GPIO8
-        mode: INPUT_PULLDOWN
-    mode: ANY_HIGH
+# Deep sleep - DISABLED per evitare conflitti GPIO
+# Se necessario, può essere riabilitato configurando il wake via MG24
+# deep_sleep:
+#   id: deep_sleep_mode
 
 # Sensori di diagnostica
 sensor:
