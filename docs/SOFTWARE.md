@@ -727,4 +727,179 @@ data:
 
 ---
 
+## 📋 BACKLOG — Lavoro UART da Fare
+
+Questa sezione traccia il lavoro pianificato per sostituire il protocollo GPIO binario (MOTION/ALIVE) con una comunicazione UART strutturata su **MG24 D6 (TX) / D7 (RX)** ↔ **ESP32 Serial1**.
+
+---
+
+### [ ] 1. Definire il protocollo messaggi strutturati MG24 → ESP32
+
+Il protocollo deve essere leggero (adatto a 115200 baud, nessun allocator dinamico sul MG24) e facilmente decodificabile in MicroPython.
+
+**Formato proposto — frame binario fisso 4 byte:**
+
+```
+┌────────┬────────┬────────┬────────┐
+│  0xAA  │  TYPE  │ INTENS │  0x55  │
+│ (sync) │ (gesto)│ (0-255)│ (end)  │
+└────────┴────────┴────────┴────────┘
+```
+
+| Campo    | Valore         | Descrizione                              |
+|----------|----------------|------------------------------------------|
+| `0xAA`   | sync byte      | Marker di inizio frame                   |
+| `TYPE`   | enum 1 byte    | Tipo movimento (vedi tabella sotto)      |
+| `INTENS` | 0–255          | Intensità normalizzata (0 = minimo, 255 = massimo) |
+| `0x55`   | end byte       | Marker di fine frame (sanity check)      |
+
+**Tipi di movimento (`TYPE`):**
+
+| Valore | Nome          | Trigger                                     |
+|--------|---------------|---------------------------------------------|
+| `0x01` | `MOTION`      | Movimento generico (rimpiazza GPIO pulse)   |
+| `0x02` | `SHAKE`       | Oscillazione rapida su ≥2 assi             |
+| `0x03` | `ROLL`        | Rotazione continua (aSum > soglia per >500ms) |
+| `0x04` | `TAP`         | Picco singolo breve (< 100ms)              |
+| `0x05` | `DOUBLE_TAP`  | Due picchi entro 300ms                     |
+| `0x06` | `TILT`        | Inclinazione statica (asse Z fuori range)  |
+| `0xFF` | `HEARTBEAT`   | Keep-alive ogni 2s (nessun movimento)      |
+
+---
+
+### [ ] 2. Encoder lato Arduino (MG24 — `mg24_imu.ino`)
+
+Modifiche al loop Arduino per inviare frame UART invece di (o in aggiunta a) il pulse GPIO:
+
+```cpp
+// Aggiungi a mg24_imu.ino
+
+#define UART_BAUD   115200
+#define FRAME_SYNC  0xAA
+#define FRAME_END   0x55
+
+// Enum tipi gesto
+enum GestureType : uint8_t {
+  MOTION     = 0x01,
+  SHAKE      = 0x02,
+  ROLL       = 0x03,
+  TAP        = 0x04,
+  DOUBLE_TAP = 0x05,
+  TILT       = 0x06,
+  HEARTBEAT  = 0xFF,
+};
+
+void sendGestureFrame(GestureType type, uint8_t intensity) {
+  Serial1.write(FRAME_SYNC);
+  Serial1.write((uint8_t)type);
+  Serial1.write(intensity);
+  Serial1.write(FRAME_END);
+}
+
+// Nel setup():
+//   Serial1.begin(UART_BAUD);  // D6=TX, D7=RX
+
+// Nel loop(), sostituire il pulse GPIO con:
+//   uint8_t intensity = (uint8_t)constrain(map(aSum * 100, 0, 500, 0, 255), 0, 255);
+//   sendGestureFrame(MOTION, intensity);
+//   (mantenere anche il GPIO D4 per compatibilità con deep-sleep wake)
+
+// Heartbeat separato ogni 2s:
+//   static unsigned long lastHeartbeat = 0;
+//   if (millis() - lastHeartbeat > 2000) {
+//     sendGestureFrame(HEARTBEAT, 0);
+//     lastHeartbeat = millis();
+//   }
+```
+
+**Note implementative:**
+- `Serial1` su XIAO MG24 usa fisicamente `D6` (TX) e `D7` (RX) — verificare pinout con `Serial1.begin()` nella libreria Seeed
+- Mantenere il pulse su `D4` (GPIO) per continuare a fare wake dall'ESP32 deep sleep (il UART non può wakeup da deep sleep senza hardware UART wakeup)
+- `intensity` = `aSum` scalata su 0–255 (`map(aSum, 0, 5.0, 0, 255)`)
+
+---
+
+### [ ] 3. Decoder lato MicroPython (ESP32 — `ESP32/main.py`)
+
+Aggiungere un thread o ISR che legge i frame UART e aggiorna lo stato delle animazioni:
+
+```python
+# Aggiungere in main.py o in un nuovo file uart_receiver.py
+
+from machine import UART
+import struct
+
+UART_BAUD     = 115200
+FRAME_SYNC    = 0xAA
+FRAME_END     = 0x55
+FRAME_LEN     = 4
+
+GESTURE_NAMES = {
+    0x01: "MOTION",
+    0x02: "SHAKE",
+    0x03: "ROLL",
+    0x04: "TAP",
+    0x05: "DOUBLE_TAP",
+    0x06: "TILT",
+    0xFF: "HEARTBEAT",
+}
+
+# Inizializzazione (scegliere i pin UART corretti per ESP32-S3 Tiny)
+uart = UART(1, baudrate=UART_BAUD, tx=PIN_UART_TX, rx=PIN_UART_RX)
+
+def read_gesture_frame():
+    """
+    Legge un frame da 4 byte. Ritorna (gesture_type, intensity) o None.
+    Cerca il sync byte 0xAA per risincronizzarsi in caso di rumore.
+    """
+    while uart.any():
+        b = uart.read(1)[0]
+        if b != FRAME_SYNC:
+            continue
+        rest = uart.read(3)
+        if len(rest) < 3 or rest[2] != FRAME_END:
+            continue
+        return rest[0], rest[1]   # (type, intensity)
+    return None
+
+def uart_monitor_loop():
+    """Thread che processa i frame UART e aggiorna lo stato globale."""
+    global last_motion_time, active, current_gesture
+    while True:
+        frame = read_gesture_frame()
+        if frame:
+            gesture_type, intensity = frame
+            if gesture_type != 0xFF:   # ignora heartbeat
+                last_motion_time = time.ticks_ms()
+                current_gesture = gesture_type
+                # TODO: mappare tipo gesto → animazione specifica
+                #   0x02 SHAKE  → effetto "esplosione" rapido
+                #   0x03 ROLL   → effetto rotazione
+                #   0x04 TAP    → flash singolo
+        time.sleep_ms(10)
+```
+
+**Note implementative:**
+- Identificare i pin UART1 fisici sull'ESP32-S3 Tiny (controllare lo schema della board)
+- Il frame sync `0xAA` + end `0x55` permette di risincronizzarsi senza buffer circolare complesso
+- Il `HEARTBEAT` serve a rilevare se il MG24 si è bloccato (assenza per >5s = errore)
+- Fase successiva: mappare `current_gesture` a effetti animazione diversi in `animations/`
+
+---
+
+### [ ] 4. Mapping gesti → animazioni (fase successiva)
+
+Dopo aver validato il canale UART, collegare i tipi di gesto alle animazioni:
+
+| Gesto         | Animazione LED suggerita                          |
+|---------------|---------------------------------------------------|
+| `MOTION`      | Comportamento attuale (pulse verde)               |
+| `SHAKE`       | Flash bianco rapido + burst intensità             |
+| `ROLL`        | `RotationAnimation` con velocità proporzionale a `intensity` |
+| `TAP`         | Singolo flash del gruppo core (group 0)           |
+| `DOUBLE_TAP`  | Cambio effetto ciclico                            |
+| `TILT`        | Colore base cambia (verde → ciano → blu) in base all'asse |
+
+---
+
 **Ultimo aggiornamento:** Aprile 2026

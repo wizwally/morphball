@@ -176,6 +176,15 @@ Seeed XIAO MG24
 │ D5  ◄────────────┼──── ESP32 GPIO7
 │ (PIN_ALIVE)      │
 │                  │
+│ D6  ─────────────┼──► ESP32 RX   (Serial1 TX, future UART)
+│ (Serial1 TX)     │
+│                  │
+│ D7  ◄────────────┼──── ESP32 TX  (Serial1 RX, future UART)
+│ (Serial1 RX)     │
+│                  │
+│ D11 ─────────────┼──► SAMD11 (debug bridge, DO NOT TOUCH)
+│ D12 ◄────────────┼──── SAMD11 (debug bridge, DO NOT TOUCH)
+│                  │
 │ SDA ─────┐       │
 │          │ LSM6DS3 (internal)
 │ SCL ─────┘       │
@@ -193,6 +202,17 @@ Seeed XIAO MG24
 - `HIGH` (200ms pulse): Motion detected (acceleration > 2.5G)
 - `LOW`: No movement
 - Wake pin for ESP32 deep sleep
+
+**UART Serial1 (MG24 D6/D7 ↔ ESP32) — reserved, not yet active:**
+- `D6` (MG24 TX) → ESP32 RX: structured IMU messages (gesture type + intensity)
+- `D7` (MG24 RX) ← ESP32 TX: future configuration commands
+- Target baud rate: 115200
+- See BACKLOG section in SOFTWARE.md for the protocol to implement
+
+**SAMD11 Debug Bridge (D11/D12) — DO NOT TOUCH:**
+- Internal connection to the SAMD11 chip that handles USB/JTAG on the XIAO PCB
+- Reserved exclusively for the board's programmer/debugger
+- Short-circuits or writes on these pins can damage the bridge or block flashing
 
 ### Power Supply
 

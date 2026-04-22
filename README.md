@@ -124,6 +124,9 @@ ESP32-S3 Tiny          MG24 (XIAO)         LED Strip
 **MG24 (XIAO):**
 - `D4`: Output to ESP32 (pulse on movement)
 - `D5`: Input from ESP32 (animation status)
+- `D6`: Serial1 TX → ESP32 RX (future UART, structured IMU messages)
+- `D7`: Serial1 RX ← ESP32 TX (future UART, configuration commands)
+- `D11/D12`: SAMD11 debug bridge — **DO NOT TOUCH**
 - `SDA/SCL`: I2C for LSM6DS3 (internal)
 
 ### LED Layout
